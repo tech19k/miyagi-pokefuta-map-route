@@ -162,6 +162,35 @@ body.route .routebtn{background:#fff;color:var(--rose)}
 .stopnum{background:#fff;border:2.5px solid var(--rose);color:var(--rose);font-weight:700;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
 @media(max-width:780px){#routePanel{position:absolute;z-index:1150;top:0;bottom:0;left:0;width:90%;max-width:360px;box-shadow:var(--shadow)}}
 
+
+/* ===== mobile layout fix (compact header + bottom-sheet panels) ===== */
+@media(max-width:780px){
+  header{padding:7px 11px;gap:7px}
+  .brand{gap:8px}
+  .brand h1{font-size:14.5px}
+  .brand .sub{display:none}
+  .egg{width:30px;height:34px}
+  .counts{display:none}
+  .controls{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:2px;scrollbar-width:none;-ms-overflow-style:none}
+  .controls::-webkit-scrollbar{display:none}
+  .mtoggle,.routebtn,.seg,.search{flex:0 0 auto}
+  .seg button,.chip{padding:6px 11px;font-size:12px}
+  .search{min-width:150px}
+  /* list + route panel become bottom sheets so the map stays visible */
+  aside{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;height:64vh;
+    transform:translateY(103%);border-right:none;border-top:2px solid var(--line);
+    border-radius:18px 18px 0 0;box-shadow:0 -7px 24px rgba(40,30,20,.22);padding-top:6px;z-index:1100}
+  aside.open{transform:translateY(0)}
+  #routePanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-width:none;height:72vh;
+    border-right:none;border-top:2px solid var(--line);border-radius:18px 18px 0 0;
+    box-shadow:0 -7px 24px rgba(40,30,20,.22);padding-top:6px;z-index:1150}
+  aside::before,#routePanel::before{content:"";display:block;width:44px;height:5px;border-radius:3px;
+    background:#cdbfa8;margin:0 auto 9px}
+  /* floating close button for the list sheet */
+  #listClose{display:flex}
+}
+#listClose{display:none}
+
 </style>
 </head>
 <body>
@@ -201,6 +230,7 @@ body.route .routebtn{background:#fff;color:var(--rose)}
 
 <main>
   <aside id="aside"></aside>
+  <button id="listClose" aria-label="一覧を閉じる" style="position:fixed;z-index:1101;right:14px;bottom:calc(64vh - 22px);width:38px;height:38px;border-radius:50%;border:none;background:var(--ink);color:#fff;font-size:18px;line-height:1;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer">✕</button>
 
 <div id="routePanel">
   <div class="rp-head"><span>🧭 ルート計画</span><button id="routeClose">地図に戻る</button></div>
@@ -483,6 +513,10 @@ function showResult(d,mode,note){
   }
   html+='</div>';document.getElementById('routeResult').innerHTML=html;
 }
+
+
+var _lc=document.getElementById('listClose');
+if(_lc){_lc.addEventListener('click',()=>aside.classList.remove('open'));}
 
 render();
 </script>
