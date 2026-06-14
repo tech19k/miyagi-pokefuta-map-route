@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>みやぎ ポケふた & 道の駅 マップ（ルート計画つき）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#EFF6FB; --paper:#FFFFFF; --ink:#1E2A33; --muted:#667581;
+    --rose:#1E6FB0; --poke:#2E86C8; --pink:#9CC9EA; --pinklite:#DCEBF7;
+    --eki:#1C7A4A; --ekilite:#E3F1E8; --gold:#E8B84B;
+    --line:#EAE0D2; --shadow:0 6px 22px rgba(60,40,30,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Zen Kaku Gothic New",system-ui,sans-serif;
+    color:var(--ink); background:var(--cream);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  /* ---------- header ---------- */
+  header{
+    background:linear-gradient(100deg,#fff 0%,#fff 55%,var(--pinklite) 100%);
+    border-bottom:2px solid var(--line);
+    padding:10px 18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    z-index:1200;
+  }
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .egg{
+    width:38px;height:42px;border-radius:50% 50% 48% 48%/42% 42% 58% 58%;
+    background:radial-gradient(circle at 38% 32%,#fff 0 8px,#FBE2E6 9px 100%);
+    border:2px solid var(--rose); position:relative; flex:0 0 auto;
+    box-shadow:inset 0 -4px 0 rgba(209,77,92,.12);
+  }
+  .egg::after{content:"";position:absolute;left:7px;right:7px;bottom:9px;height:7px;
+    border-radius:6px;background:repeating-linear-gradient(90deg,var(--rose) 0 4px,transparent 4px 7px);opacity:.5}
+  .brand h1{font-family:"Mochiy Pop One",sans-serif;font-weight:400;font-size:19px;margin:0;line-height:1.15;color:var(--rose)}
+  .brand .sub{font-size:11.5px;color:var(--muted);margin-top:1px;letter-spacing:.02em}
+  .counts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
+    background:var(--paper);border:1.5px solid var(--line);border-radius:999px;padding:5px 11px}
+  .pill .dotp{width:11px;height:11px;border-radius:50%;background:var(--poke);box-shadow:0 0 0 2px #fff,0 0 0 3px var(--poke)}
+  .pill .dote{width:11px;height:11px;border-radius:3px;background:var(--eki)}
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%}
+  .seg{display:flex;background:var(--paper);border:1.5px solid var(--line);border-radius:999px;padding:3px}
+  .seg button,.chip{font-family:inherit;cursor:pointer}
+  .seg button{border:none;background:transparent;color:var(--muted);font-weight:700;font-size:12.5px;
+    padding:6px 13px;border-radius:999px;transition:.15s}
+  .seg button.on{background:var(--ink);color:#fff}
+  .seg.type button.on[data-k="poke"]{background:var(--poke)}
+  .seg.type button.on[data-k="eki"]{background:var(--eki)}
+  .chip{border:1.5px solid var(--line);background:var(--paper);color:var(--muted);font-weight:700;
+    font-size:12px;padding:6px 12px;border-radius:999px;transition:.15s}
+  .chip.on{background:var(--gold);border-color:var(--gold);color:#3a2d0d}
+  .search{flex:1;min-width:150px;display:flex;align-items:center;gap:7px;background:var(--paper);
+    border:1.5px solid var(--line);border-radius:999px;padding:6px 13px}
+  .search input{border:none;outline:none;font-family:inherit;font-size:13.5px;width:100%;background:transparent;color:var(--ink)}
+  .search svg{flex:0 0 auto;opacity:.5}
+  /* ---------- main ---------- */
+  main{flex:1;display:flex;min-height:0}
+  #map{flex:1;min-width:0}
+  aside{width:340px;flex:0 0 340px;background:var(--cream);border-right:2px solid var(--line);
+    overflow-y:auto;padding:12px}
+  .listhead{font-size:11.5px;font-weight:700;color:var(--muted);padding:2px 4px 9px;display:flex;justify-content:space-between}
+  .card{background:var(--paper);border:1.5px solid var(--line);border-radius:14px;padding:11px 13px;margin-bottom:9px;
+    cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+  .card:hover{border-color:var(--pink);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .card.sel{border-color:var(--rose);box-shadow:0 0 0 3px var(--pinklite)}
+  .card .tag{position:absolute;top:0;right:0;font-size:10px;font-weight:700;color:#fff;padding:3px 9px;border-radius:0 12px 0 12px}
+  .card.poke .tag{background:var(--poke)} .card.eki .tag{background:var(--eki)}
+  .card h3{margin:0 56px 3px 0;font-size:15px;font-weight:700}
+  .card .meta{font-size:11.5px;color:var(--muted);margin-bottom:5px}
+  .card .feat{font-size:12px;color:#5a524a;line-height:1.45}
+  .card .addr{font-size:11px;color:var(--muted);margin-top:5px;display:flex;gap:5px}
+  .card .addr svg{flex:0 0 auto;margin-top:1px;opacity:.6}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:40px 10px;line-height:1.6}
+  /* ---------- leaflet markers & popup ---------- */
+  .mk{transition:transform .12s} .mk:hover{transform:scale(1.18);z-index:9999}
+  .mk-poke{width:22px;height:22px;border-radius:50%;border:2.5px solid #fff;
+    background:radial-gradient(circle at 50% 50%,#fff 0 3px,var(--poke) 3px 6.5px,#fff 6.5px 8px,#cf2e2e 8px);
+    box-shadow:0 2px 5px rgba(0,0,0,.32)}
+  .mk-eki{width:19px;height:19px;border-radius:5px;border:2.5px solid #fff;background:var(--eki);
+    box-shadow:0 2px 5px rgba(0,0,0,.32);position:relative}
+  .mk-eki::after{content:"";position:absolute;inset:3px;border:1.5px solid rgba(255,255,255,.85);border-radius:2px}
+  .mk-sel{outline:3px solid var(--gold);outline-offset:2px;border-radius:50%}
+  .leaflet-popup-content-wrapper{border-radius:15px;box-shadow:var(--shadow);border:1.5px solid var(--line)}
+  .leaflet-popup-content{margin:0;width:255px!important}
+  .pop{font-family:"Zen Kaku Gothic New",sans-serif}
+  .pop .bar{padding:11px 14px 9px;color:#fff} .pop.poke .bar{background:var(--poke)} .pop.eki .bar{background:var(--eki)}
+  .pop .kind{font-size:10.5px;font-weight:700;opacity:.9;letter-spacing:.06em}
+  .pop .bar h3{margin:2px 0 0;font-size:16.5px;font-weight:700}
+  .pop .body{padding:11px 14px 13px}
+  .pop .row{display:flex;gap:8px;font-size:12.5px;margin-bottom:8px;line-height:1.5}
+  .pop .row svg{flex:0 0 auto;margin-top:2px;color:var(--rose)}
+  .pop .ttl{font-size:10.5px;color:var(--muted);font-weight:700}
+  .pop .btns{display:flex;gap:7px;margin-top:4px}
+  .pop a.btn{flex:1;text-align:center;text-decoration:none;font-size:12px;font-weight:700;padding:8px 6px;border-radius:9px}
+  .pop a.gmap{background:var(--ink);color:#fff} .pop a.off{background:var(--pinklite);color:var(--rose)}
+  /* map legend */
+  .legend{background:rgba(255,255,255,.94);border:1.5px solid var(--line);border-radius:12px;
+    padding:8px 11px;font-size:11.5px;line-height:1.7;box-shadow:var(--shadow)}
+  .legend b{font-weight:700} .legend .lg{display:flex;align-items:center;gap:7px}
+  .legend .sp{width:13px;height:13px;border-radius:50%;border:2px solid #fff;background:var(--poke);box-shadow:0 0 0 1px #ccc}
+  .legend .sq{width:12px;height:12px;border-radius:3px;background:var(--eki)}
+  .note{font-size:10px;color:var(--muted);margin-top:5px;border-top:1px dashed var(--line);padding-top:5px;max-width:185px}
+  /* mobile */
+  .mtoggle{display:none}
+  @media(max-width:780px){
+    aside{position:absolute;z-index:1100;top:0;bottom:0;left:0;width:86%;max-width:340px;
+      transform:translateX(-101%);transition:.25s;box-shadow:var(--shadow)}
+    aside.open{transform:none}
+    .mtoggle{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:#fff;
+      border-radius:999px;padding:7px 13px;font-weight:700;font-size:12.5px;font-family:inherit;cursor:pointer}
+    .brand h1{font-size:16px}.counts{order:3}
+  }
+
+/* ---- route planner ---- */
+#routePanel{width:340px;flex:0 0 340px;background:var(--cream);border-right:2px solid var(--line);overflow-y:auto;padding:12px;display:none}
+body.route #aside{display:none}
+body.route #routePanel{display:block}
+.rp-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:15px;margin-bottom:8px}
+.rp-head button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-family:inherit;font-size:12px;cursor:pointer}
+.rp-hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:9px}
+.rp-add{width:100%;padding:9px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;background:#fff;margin-bottom:10px}
+.rp-stops{display:flex;flex-direction:column;gap:7px;margin-bottom:11px}
+.rp-stop{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--line);border-radius:11px;padding:7px 9px}
+.rp-num{flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:var(--poke);color:#fff;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rp-stop.end .rp-num{background:var(--rose)} .rp-stop.via .rp-num{background:var(--gold);color:#3a2d0d}
+.rp-sname{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-srole{font-size:10px;color:var(--muted);font-weight:700}
+.rp-stop .mv{border:none;background:#eef1f5;border-radius:6px;width:22px;height:22px;cursor:pointer;font-size:11px;line-height:1;flex:0 0 auto}
+.rp-empty{font-size:12px;color:var(--muted);text-align:center;padding:14px;border:1.5px dashed var(--line);border-radius:11px;line-height:1.6}
+.rp-opt{background:#fff;border:1.5px solid var(--line);border-radius:11px;padding:9px 11px;margin-bottom:10px;font-size:12.5px}
+.rp-opt .rp-label{font-weight:700;font-size:11px;color:var(--muted);margin-bottom:5px}
+.rp-opt label{display:flex;align-items:center;gap:6px;margin:3px 0;cursor:pointer}
+.rp-actions{display:flex;gap:8px;margin-bottom:11px}
+.rp-go{flex:1;border:none;background:var(--rose);color:#fff;font-weight:700;font-size:13.5px;padding:11px;border-radius:11px;cursor:pointer;font-family:inherit}
+.rp-go:disabled{opacity:.45;cursor:default}
+.rp-clear{border:1.5px solid var(--line);background:#fff;border-radius:11px;padding:11px 13px;font-family:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
+.rp-result{font-size:13px;line-height:1.6}
+.rp-card{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.rp-card h4{margin:0 0 6px;font-size:13.5px}
+.rp-row{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0}
+.rp-toll{color:var(--rose);font-weight:700}
+.rp-warn{font-size:10.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.rp-key{margin-top:8px;font-size:12px}
+.rp-key summary{cursor:pointer;color:var(--rose);font-weight:700}
+.rp-keybody{padding:8px 2px;font-size:11.5px;color:var(--muted);line-height:1.6}
+.rp-keybody input{width:100%;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;margin:5px 0}
+.rp-keybody a{color:var(--rose);font-weight:700;text-decoration:none}
+.rp-spin{display:inline-block;width:13px;height:13px;border:2px solid #ccc;border-top-color:var(--rose);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.routebtn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--rose);background:var(--rose);color:#fff;border-radius:999px;padding:7px 14px;font-weight:700;font-size:12.5px;font-family:inherit;cursor:pointer}
+body.route .routebtn{background:#fff;color:var(--rose)}
+.stopnum{background:#fff;border:2.5px solid var(--rose);color:var(--rose);font-weight:700;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+@media(max-width:780px){#routePanel{position:absolute;z-index:1150;top:0;bottom:0;left:0;width:90%;max-width:360px;box-shadow:var(--shadow)}}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="egg"></div>
+    <div>
+      <h1>みやぎ ポケふた &amp; 道の駅 マップ</h1>
+      <div class="sub">タップで住所と特徴をチェック ── ラプラスと巡る宮城</div>
+    </div>
+  </div>
+  <div class="counts">
+    <span class="pill"><span class="dotp"></span>ポケふた 35</span>
+    <span class="pill"><span class="dote"></span>道の駅 17</span>
+  </div>
+  <div class="controls">
+    <button class="mtoggle" id="mtoggle">☰ 一覧</button>
+    <button class="routebtn" id="routeBtn">🧭 ルート計画</button>
+    <div class="seg type" id="typeSeg">
+      <button data-k="all" class="on">すべて</button>
+      <button data-k="poke">ポケふた</button>
+      <button data-k="eki">道の駅</button>
+    </div>
+    <div class="seg" id="regionSeg" style="padding:3px">
+      <button data-r="all" class="on">全県</button>
+      <button data-r="south">県南</button>
+      <button data-r="sendai">仙台</button>
+      <button data-r="north">県北</button>
+      <button data-r="coast">沿岸</button>
+    </div>
+    <label class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" placeholder="市町村・道の駅名・特徴で検索">
+    </label>
+  </div>
+</header>
+
+<main>
+  <aside id="aside"></aside>
+
+<div id="routePanel">
+  <div class="rp-head"><span>🧭 ルート計画</span><button id="routeClose">地図に戻る</button></div>
+  <div class="rp-hint">出発地 → 経由地 → 到着地 の順に追加します。地図のマーカーをタップ、または下のメニューから選択。</div>
+  <select class="rp-add" id="addSelect"><option value="">＋ 地点を選んで追加…</option></select>
+  <div class="rp-stops" id="stopsList"></div>
+  <div class="rp-opt">
+    <div class="rp-label">道路の種類</div>
+    <label><input type="radio" name="rmode" value="fast" checked> 最速（有料道路あり）</label>
+    <label><input type="radio" name="rmode" value="free"> 一般道のみ（料金なし）</label>
+  </div>
+  <div class="rp-actions">
+    <button id="routeGo" class="rp-go" disabled>ルートを検索</button>
+    <button id="routeClear" class="rp-clear">クリア</button>
+  </div>
+  <div id="routeResult" class="rp-result"></div>
+  <details class="rp-key">
+    <summary>有料/一般道の出し分け・料金概算を有効にする（無料APIキー）</summary>
+    <div class="rp-keybody">
+      <p>OpenRouteService（無料）のAPIキーを貼り付けると、「一般道のみ」ルートと有料区間・通行料金の概算が使えます。キー無しでも距離・時間の簡易ルートは使えます。</p>
+      <input id="orsKey" placeholder="ORS APIキーを貼り付け（任意）">
+      <a href="https://openrouteservice.org/dev/#/signup" target="_blank">▶ 無料キーを取得する</a>
+    </div>
+  </details>
+</div>
+
+  <div id="map"></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const R={south:"県南",sendai:"仙台都市圏",north:"県北",coast:"三陸沿岸"};
+// kind: poke|eki ; region: hama|naka|aizu
+const SPOTS=[
+// ===== ポケふた（宮城・全35市町村）=====
+{k:"poke",n:"ポケふた 白石市",mu:"白石市",rg:"south",lat:38.003,lng:140.620,pl:"白石城周辺（要確認）",ad:"白石市",ft:"応援ポケモン「ラプラス」と白石城・白石温麺の城下町をイメージ。"},
+{k:"poke",n:"ポケふた 角田市",mu:"角田市",rg:"south",lat:37.978,lng:140.781,pl:"角田市内（要確認）",ad:"角田市",ft:"ラプラスと、宇宙開発（ロケット）のまち角田をイメージ。"},
+{k:"poke",n:"ポケふた 蔵王町",mu:"蔵王町",rg:"south",lat:38.101,lng:140.659,pl:"蔵王町内（要確認）",ad:"刈田郡蔵王町",ft:"ラプラスと、蔵王の御釜・温泉をイメージ。"},
+{k:"poke",n:"ポケふた 七ヶ宿町",mu:"七ヶ宿町",rg:"south",lat:38.013,lng:140.418,pl:"道の駅七ヶ宿 周辺（要確認）",ad:"刈田郡七ヶ宿町",ft:"ラプラスと、七ヶ宿ダム・水のまちをイメージ。"},
+{k:"poke",n:"ポケふた 大河原町",mu:"大河原町",rg:"south",lat:38.054,lng:140.730,pl:"白石川公園入口（尾形橋付近）",ad:"大河原町大谷字町向116-26地先",ft:"ラプラス＋チェリム。一目千本桜（白石川堤）をイメージ。"},
+{k:"poke",n:"ポケふた 村田町",mu:"村田町",rg:"south",lat:38.121,lng:140.722,pl:"蔵の町並み周辺（道の駅村田 近く・要確認）",ad:"柴田郡村田町",ft:"ラプラスと、蔵の町並み・そら豆をイメージ。"},
+{k:"poke",n:"ポケふた 柴田町",mu:"柴田町",rg:"south",lat:38.057,lng:140.768,pl:"船岡城址公園周辺（要確認）",ad:"柴田郡柴田町",ft:"ラプラスと、船岡城址公園の桜・曼珠沙華をイメージ。"},
+{k:"poke",n:"ポケふた 川崎町",mu:"川崎町",rg:"south",lat:38.117,lng:140.648,pl:"みちのく杜の湖畔公園 周辺（要確認）",ad:"柴田郡川崎町",ft:"ラプラス中心のデザイン。釜房湖・蔵王連峰の自然をイメージ。"},
+{k:"poke",n:"ポケふた 丸森町",mu:"丸森町",rg:"south",lat:37.917,lng:140.766,pl:"丸森町内（要確認）",ad:"伊具郡丸森町",ft:"ラプラス＋ニャース＋ニャスパー。阿武隈川舟運の里をイメージ。"},
+{k:"poke",n:"ポケふた 亘理町",mu:"亘理町",rg:"south",lat:38.035,lng:140.851,pl:"鳥の海 周辺（要確認）",ad:"亘理郡亘理町",ft:"ラプラスと、いちご・はらこめしのまちをイメージ。"},
+{k:"poke",n:"ポケふた 山元町",mu:"山元町",rg:"south",lat:37.962,lng:140.910,pl:"やまもと夢いちごの郷 周辺（要確認）",ad:"亘理郡山元町",ft:"ラプラスと、いちご・ホッキ貝のまちをイメージ。"},
+{k:"poke",n:"ポケふた 名取市",mu:"名取市",rg:"south",lat:38.171,lng:140.891,pl:"名取市内（要確認）",ad:"名取市",ft:"色違いラプラスのレアデザイン。閖上・ゆりあげ港朝市の海辺をイメージ。"},
+{k:"poke",n:"ポケふた 岩沼市",mu:"岩沼市",rg:"south",lat:38.104,lng:140.870,pl:"竹駒神社 周辺（要確認）",ad:"岩沼市",ft:"ラプラスと、竹駒神社・千年希望の丘をイメージ。"},
+{k:"poke",n:"ポケふた 仙台市",mu:"仙台市",rg:"sendai",lat:38.260,lng:140.882,pl:"仙台市中心部（要確認）",ad:"仙台市",ft:"ラプラス中心のデザイン。杜の都・仙台七夕まつりをイメージ。"},
+{k:"poke",n:"ポケふた 多賀城市",mu:"多賀城市",rg:"sendai",lat:38.296,lng:140.992,pl:"多賀城跡 周辺（要確認）",ad:"多賀城市",ft:"ラプラスと、多賀城跡・古代のまちをイメージ。"},
+{k:"poke",n:"ポケふた 塩竈市",mu:"塩竈市",rg:"sendai",lat:38.317,lng:141.022,pl:"本塩釜駅前",ad:"塩竈市海岸通（本塩釜駅前）",ft:"ラプラス＋プラスル。名物「塩竈おでん」が並ぶデザイン。"},
+{k:"poke",n:"ポケふた 松島町",mu:"松島町",rg:"sendai",lat:38.371,lng:141.063,pl:"松島海岸グリーン広場（松島海岸駅 徒歩5分）",ad:"宮城郡松島町松島",ft:"ラプラス中心。日本三景・松島湾の島々をイメージ。"},
+{k:"poke",n:"ポケふた 七ヶ浜町",mu:"七ヶ浜町",rg:"sendai",lat:38.298,lng:141.060,pl:"花渕浜 周辺（要確認）",ad:"宮城郡七ヶ浜町",ft:"ラプラスと、菖蒲田海水浴場・国際村の海辺をイメージ。"},
+{k:"poke",n:"ポケふた 利府町",mu:"利府町",rg:"sendai",lat:38.330,lng:140.974,pl:"利府町役場 入口付近",ad:"宮城郡利府町利府字新並",ft:"ラプラス＋マイナン。塩竈市とおそろいのデザイン。梨も名産。"},
+{k:"poke",n:"ポケふた 富谷市",mu:"富谷市",rg:"sendai",lat:38.398,lng:140.892,pl:"しんまち地区 周辺（要確認）",ad:"富谷市",ft:"ラプラスと、富谷宿・ブルーベリーのまちをイメージ。"},
+{k:"poke",n:"ポケふた 大和町",mu:"大和町",rg:"sendai",lat:38.443,lng:140.882,pl:"大和町内（要確認）",ad:"黒川郡大和町",ft:"ラプラス＋タマゲタケ＋ドダイトス。船形山・七ツ森をイメージ。"},
+{k:"poke",n:"ポケふた 大郷町",mu:"大郷町",rg:"sendai",lat:38.397,lng:140.951,pl:"道の駅おおさと",ad:"黒川郡大郷町中村字北浦51-6",ft:"ラプラス＋チュリネ。道の駅おおさとに設置。"},
+{k:"poke",n:"ポケふた 大衡村",mu:"大衡村",rg:"sendai",lat:38.461,lng:140.886,pl:"万葉クリエートパーク 周辺（要確認）",ad:"黒川郡大衡村",ft:"ラプラス＋プルリル＋ラブカス。万葉の里・牛野ダムをイメージ。"},
+{k:"poke",n:"ポケふた 大崎市",mu:"大崎市",rg:"north",lat:38.573,lng:140.955,pl:"古川 周辺（要確認）",ad:"大崎市",ft:"ラプラスと、ササニシキ・鳴子温泉郷をイメージ。"},
+{k:"poke",n:"ポケふた 加美町",mu:"加美町",rg:"north",lat:38.553,lng:140.852,pl:"中新田 周辺（要確認）",ad:"加美郡加美町",ft:"ラプラス＋ロゼリア。やくらいガーデンの花畑をイメージ。"},
+{k:"poke",n:"ポケふた 色麻町",mu:"色麻町",rg:"north",lat:38.523,lng:140.876,pl:"色麻町内（要確認）",ad:"加美郡色麻町",ft:"ラプラス＋ハスブレロ。河童伝説のまち・愛宕山をイメージ。"},
+{k:"poke",n:"ポケふた 涌谷町",mu:"涌谷町",rg:"north",lat:38.546,lng:141.124,pl:"城山公園 周辺（要確認）",ad:"遠田郡涌谷町",ft:"ラプラス＋バンバドロ。日本初の産金の地・城山の桜をイメージ。"},
+{k:"poke",n:"ポケふた 美里町",mu:"美里町",rg:"north",lat:38.546,lng:141.040,pl:"小牛田 周辺（要確認）",ad:"遠田郡美里町",ft:"ラプラス＋ドードー＋ドードリオ。北浦梨・チューリップをイメージ。"},
+{k:"poke",n:"ポケふた 栗原市",mu:"栗原市",rg:"north",lat:38.730,lng:141.022,pl:"築館 周辺（要確認）",ad:"栗原市",ft:"ラプラスと、伊豆沼・くりはら田園鉄道をイメージ。"},
+{k:"poke",n:"ポケふた 登米市",mu:"登米市",rg:"north",lat:38.691,lng:141.188,pl:"登米市内（要確認）",ad:"登米市",ft:"ラプラスと、みやぎの明治村・ラムサール条約湿地をイメージ。"},
+{k:"poke",n:"ポケふた 石巻市",mu:"石巻市",rg:"coast",lat:38.434,lng:141.302,pl:"石ノ森萬画館 周辺（要確認）",ad:"石巻市",ft:"ラプラスと、石ノ森章太郎・サン・ファン号の港町をイメージ。"},
+{k:"poke",n:"ポケふた 東松島市",mu:"東松島市",rg:"coast",lat:38.426,lng:141.210,pl:"矢本 周辺（要確認）",ad:"東松島市",ft:"ラプラスと、ブルーインパルス・宮戸島をイメージ。"},
+{k:"poke",n:"ポケふた 女川町",mu:"女川町",rg:"coast",lat:38.435,lng:141.448,pl:"女川駅前 周辺（要確認）",ad:"牡鹿郡女川町",ft:"ラプラスと、女川駅・シーパルピア女川の海辺をイメージ。"},
+{k:"poke",n:"ポケふた 気仙沼市",mu:"気仙沼市",rg:"coast",lat:38.908,lng:141.570,pl:"気仙沼駅から徒歩約20分（要確認）",ad:"気仙沼市",ft:"ラプラス＋イシツブテ（隣県岩手の応援ポケモン）。漁港のまちをイメージ。"},
+{k:"poke",n:"ポケふた 南三陸町",mu:"南三陸町",rg:"coast",lat:38.700,lng:141.452,pl:"歌津駅 周辺（徒歩約3分）",ad:"本吉郡南三陸町歌津",ft:"ラプラス＋オクタン。タコ・さんさん商店街をイメージ。"},
+
+// ===== 道の駅（宮城・主要17駅）=====
+{k:"eki",n:"道の駅七ヶ宿",mu:"七ヶ宿町",rg:"south",lat:38.013,lng:140.418,pl:"国道113号沿い",ad:"刈田郡七ヶ宿町字野沢倉山2-119",ft:"七ヶ宿ダム自然休養公園のそば。地場産品・軽食。"},
+{k:"eki",n:"道の駅村田",mu:"村田町",rg:"south",lat:38.123,lng:140.717,pl:"歴史みらい館併設",ad:"柴田郡村田町大字村田字北塩内41",ft:"蔵の町並みの玄関口。そら豆ソフト、歴史展示。"},
+{k:"eki",n:"道の駅かくだ",mu:"角田市",rg:"south",lat:37.985,lng:140.804,pl:"国道沿い",ad:"角田市枝野字北島81-1",ft:"宇宙のまちらしいロケット展示。地場野菜の直売。"},
+{k:"eki",n:"道の駅三本木（やまなみ）",mu:"大崎市",rg:"north",lat:38.491,lng:140.917,pl:"国道4号沿い",ad:"大崎市三本木字大豆坂63-13",ft:"亜炭記念館を併設。ひまわりのまちの物産館。"},
+{k:"eki",n:"道の駅あ・ら・伊達な道の駅",mu:"大崎市",rg:"north",lat:38.665,lng:140.793,pl:"国道47号沿い・鳴子方面",ad:"大崎市岩出山池月字下宮道下4-1",ft:"年間300万人超の人気駅。新鮮野菜・パン、気球も。"},
+{k:"eki",n:"道の駅おおさき",mu:"大崎市",rg:"north",lat:38.572,lng:140.957,pl:"古川・市街地",ad:"大崎市古川千手寺町2-5-50",ft:"住宅街の都市型道の駅。コンビニ・ドッグラン併設。"},
+{k:"eki",n:"道の駅路田里はなやま",mu:"栗原市",rg:"north",lat:38.802,lng:140.838,pl:"国道398号沿い・花山",ad:"栗原市花山字本沢北ノ前112-1",ft:"山あいの小駅。地場産品・軽食、温泉も近い。"},
+{k:"eki",n:"道の駅津山（もくもくランド）",mu:"登米市",rg:"north",lat:38.594,lng:141.382,pl:"国道45号沿い",ad:"登米市津山町横山字細屋26-1",ft:"木工のまち。木製品・地場野菜が名物。"},
+{k:"eki",n:"道の駅米山（ふる里センター）",mu:"登米市",rg:"north",lat:38.624,lng:141.215,pl:"国道346号沿い",ad:"登米市米山町西野字新遠田67",ft:"米どころの直売所。季節野菜・米が豊富。"},
+{k:"eki",n:"道の駅林林館",mu:"登米市",rg:"north",lat:38.733,lng:141.319,pl:"国道346号沿い・東和",ad:"登米市東和町米川字六反33-1",ft:"森林公園のそば。きのこ・山の幸が名物。"},
+{k:"eki",n:"道の駅みなみかた（もっこりの里）",mu:"登米市",rg:"north",lat:38.640,lng:141.205,pl:"南方",ad:"登米市南方町新高石浦150-1",ft:"ユニークな名物キャラ。地場野菜・惣菜の直売。"},
+{k:"eki",n:"道の駅三滝堂",mu:"登米市",rg:"north",lat:38.700,lng:141.330,pl:"三陸道 三滝堂IC隣接",ad:"登米市東和町米谷福平191-1",ft:"三陸道の中間点。フードコート・地場産品が充実。"},
+{k:"eki",n:"道の駅おおさと",mu:"大郷町",rg:"sendai",lat:38.397,lng:140.951,pl:"主要地方道 大和松島線",ad:"黒川郡大郷町中村字北浦51-6",ft:"地産野菜・惣菜が人気。入口にポケふたあり。"},
+{k:"eki",n:"道の駅上品の郷",mu:"石巻市",rg:"coast",lat:38.460,lng:141.231,pl:"国道45号沿い",ad:"石巻市小船越字二子北下1-1",ft:"県内屈指の人気駅。温泉「ふたごの湯」併設、直売充実。"},
+{k:"eki",n:"道の駅硯上の里おがつ",mu:"石巻市",rg:"coast",lat:38.535,lng:141.490,pl:"雄勝・硯の里",ad:"石巻市雄勝町下雄勝2-5",ft:"雄勝硯（すずり）の産地。海産物・ホタテが名物。"},
+{k:"eki",n:"道の駅おながわ",mu:"女川町",rg:"coast",lat:38.446,lng:141.451,pl:"女川駅前・シーパルピア",ad:"牡鹿郡女川町女川2-66",ft:"駅前の新しい商業エリアと一体。海鮮・カフェが充実。"},
+{k:"eki",n:"道の駅大谷海岸",mu:"気仙沼市",rg:"coast",lat:38.760,lng:141.490,pl:"国道45号沿い・大谷海岸",ad:"気仙沼市本吉町三島94-12",ft:"目の前が海。新鮮な地魚・海鮮、サメ関連も。"}
+];
+
+// ---------- map ----------
+const map=L.map('map',{zoomControl:true}).setView([38.3,141.0],8.4);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; OpenStreetMap, &copy; CARTO',maxZoom:19,subdomains:'abcd'}).addTo(map);
+map.fitBounds([[37.85,140.3],[38.98,141.66]],{padding:[20,20]});
+
+function icon(s){return L.divIcon({className:'',html:`<div class="mk mk-${s.k==='poke'?'poke':'eki'}" data-id="${s.id}"></div>`,
+  iconSize:s.k==='poke'?[22,22]:[19,19],iconAnchor:s.k==='poke'?[11,11]:[9.5,9.5]});}
+
+function gmap(s){return `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;}
+function popHtml(s){
+  const off = s.k==='poke' ? `<a class="btn off" target="_blank" href="https://local.pokemon.jp/manhole/miyagi.html">公式</a>`:'';
+  return `<div class="pop ${s.k}">
+    <div class="bar"><div class="kind">${s.k==='poke'?'POKÉ LID ・ ポケふた':'ROADSIDE ・ 道の駅'} ｜ ${R[s.rg]}</div><h3>${s.n}</h3></div>
+    <div class="body">
+      <div class="row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg><div><span class="ttl">設置・所在</span><br>${s.pl}<br><span style="color:var(--muted);font-size:11.5px">${s.ad}</span></div></div>
+      <div class="row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><div><span class="ttl">特徴</span><br>${s.ft}</div></div>
+      <div class="btns"><a class="btn gmap" target="_blank" href="${gmap(s)}">Googleマップで開く</a>${off}</div>
+    </div></div>`;
+}
+
+SPOTS.forEach((s,i)=>{s.id=i;});
+const markers=SPOTS.map(s=>{
+  const m=L.marker([s.lat,s.lng],{icon:icon(s)}).bindPopup(popHtml(s),{closeButton:true,maxWidth:280});
+  m.on('click',()=>select(s.id,false));
+  s._m=m; return m;
+});
+const layer=L.layerGroup(markers).addTo(map);
+
+// legend
+const lg=L.control({position:'bottomright'});
+lg.onAdd=function(){const d=L.DomUtil.create('div','legend');
+  d.innerHTML=`<b>凡例</b>
+    <div class="lg"><span class="sp"></span>ポケふた（全35市町村）</div>
+    <div class="lg"><span class="sq"></span>道の駅（17駅）</div>
+    <div class="note">※全37か所のうち市町村代表の35か所を掲載。住所・設置場所は参考情報、「要確認」は公式マップで確認を。</div>`;
+  return d;};
+lg.addTo(map);
+
+// ---------- sidebar list ----------
+const aside=document.getElementById('aside');
+let filter={type:'all',region:'all',q:''};
+let selId=null;
+let routeMode=false,routeStops=[],routeLayer=null,stopLayer=null;
+
+function visible(s){
+  if(filter.type!=='all'&&s.k!==filter.type) return false;
+  if(filter.region!=='all'&&s.rg!==filter.region) return false;
+  if(filter.q){const t=(s.n+s.mu+s.ft+s.pl+s.ad).toLowerCase();if(!t.includes(filter.q))return false;}
+  return true;
+}
+function render(){
+  const list=SPOTS.filter(visible);
+  // markers
+  SPOTS.forEach(s=>{const on=visible(s);if(on&&!map.hasLayer(s._m))s._m.addTo(map);if(!on&&map.hasLayer(s._m))map.removeLayer(s._m);});
+  // cards
+  aside.innerHTML='';
+  const head=document.createElement('div');head.className='listhead';
+  head.innerHTML=`<span>表示中 ${list.length} 件</span><span>クリックで地図へ</span>`;
+  aside.appendChild(head);
+  if(!list.length){aside.insertAdjacentHTML('beforeend','<div class="empty">該当する場所がありません。<br>検索条件を変えてみてください。</div>');return;}
+  list.forEach(s=>{
+    const c=document.createElement('div');
+    c.className=`card ${s.k}${s.id===selId?' sel':''}`;c.dataset.id=s.id;
+    c.innerHTML=`<span class="tag">${s.k==='poke'?'ポケふた':'道の駅'}</span>
+      <h3>${s.n}</h3>
+      <div class="meta">${s.mu} ・ ${R[s.rg]}</div>
+      <div class="feat">${s.ft}</div>
+      <div class="addr"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/></svg>${s.ad}</div>`;
+    c.onclick=()=>select(s.id,true);
+    aside.appendChild(c);
+  });
+}
+function select(id,fromList){
+  if(routeMode){addStop(id);return;}
+  selId=id;const s=SPOTS[id];
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('sel',+c.dataset.id===id));
+  const sc=aside.querySelector(`.card[data-id="${id}"]`);if(sc&&fromList!==undefined)sc.scrollIntoView({block:'nearest',behavior:'smooth'});
+  if(!map.hasLayer(s._m))s._m.addTo(map);
+  map.flyTo([s.lat,s.lng],Math.max(map.getZoom(),11),{duration:.6});
+  setTimeout(()=>s._m.openPopup(),fromList?420:0);
+  if(window.innerWidth<=780&&fromList)aside.classList.remove('open');
+}
+
+// ---------- controls ----------
+document.getElementById('typeSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#typeSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');filter.type=b.dataset.k;render();});
+document.getElementById('regionSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#regionSeg button').forEach(x=>x.classList.remove('on'));b.classList.add('on');filter.region=b.dataset.r;render();
+  const rb={all:[[37.85,140.3],[38.98,141.66]],south:[[37.85,140.35],[38.22,141.05]],sendai:[[38.2,140.78],[38.5,141.12]],north:[[38.45,140.72],[38.85,141.45]],coast:[[38.35,141.05],[38.98,141.66]]};
+  map.fitBounds(rb[filter.region],{padding:[20,20]});});
+document.getElementById('q').addEventListener('input',e=>{filter.q=e.target.value.trim().toLowerCase();render();});
+document.getElementById('mtoggle').addEventListener('click',()=>aside.classList.toggle('open'));
+
+
+// ===== Route planner =====
+const ADD=document.getElementById('addSelect');
+SPOTS.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=(s.k==='poke'?'◯ ':'■ ')+s.n;ADD.appendChild(o);});
+ADD.addEventListener('change',()=>{if(ADD.value!=='')addStop(+ADD.value);ADD.value='';});
+document.getElementById('routeBtn').addEventListener('click',toggleRoute);
+document.getElementById('routeClose').addEventListener('click',toggleRoute);
+document.getElementById('routeClear').addEventListener('click',clearRoute);
+document.getElementById('routeGo').addEventListener('click',runRoute);
+
+function toggleRoute(){routeMode=!routeMode;document.body.classList.toggle('route',routeMode);
+  if(routeMode){map.closePopup();aside.classList.remove('open');renderStops();}}
+function addStop(id){if(routeStops.length&&routeStops[routeStops.length-1]===id)return;
+  routeStops.push(id);map.closePopup();setTimeout(()=>map.closePopup(),30);renderStops();drawStops();}
+function removeStop(i){routeStops.splice(i,1);renderStops();drawStops();}
+function moveStop(i,d){const j=i+d;if(j<0||j>=routeStops.length)return;[routeStops[i],routeStops[j]]=[routeStops[j],routeStops[i]];renderStops();drawStops();}
+function clearRoute(){routeStops=[];if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}renderStops();drawStops();document.getElementById('routeResult').innerHTML='';}
+
+function renderStops(){
+  const el=document.getElementById('stopsList');
+  if(!routeStops.length){el.innerHTML='<div class="rp-empty">地点が未選択です。<br>地図のマーカー、または上のメニューから追加してください。</div>';document.getElementById('routeGo').disabled=true;return;}
+  document.getElementById('routeGo').disabled=routeStops.length<2;el.innerHTML='';
+  routeStops.forEach((id,i)=>{const s=SPOTS[id];
+    const role=i===0?'出発':(i===routeStops.length-1?'到着':'経由'+i);
+    const cls=i===0?'start':(i===routeStops.length-1?'end':'via');
+    const d=document.createElement('div');d.className='rp-stop '+cls;
+    d.innerHTML=`<div class="rp-num">${i+1}</div><div style="flex:1;min-width:0"><div class="rp-sname">${s.n}</div><div class="rp-srole">${role}・${s.mu}</div></div><button class="mv" title="上へ">▲</button><button class="mv" title="下へ">▼</button><button class="mv" title="削除">✕</button>`;
+    const b=d.querySelectorAll('.mv');b[0].onclick=()=>moveStop(i,-1);b[1].onclick=()=>moveStop(i,1);b[2].onclick=()=>removeStop(i);
+    el.appendChild(d);});
+}
+function drawStops(){
+  if(stopLayer)map.removeLayer(stopLayer);
+  stopLayer=L.layerGroup(routeStops.map((id,i)=>{const s=SPOTS[id];
+    return L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:`<div class="stopnum">${i+1}</div>`,iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:2000});})).addTo(map);
+}
+function fmtTime(sec){const m=Math.round(sec/60);if(m<60)return m+'分';return Math.floor(m/60)+'時間'+(m%60)+'分';}
+function tollYen(km){return Math.round(((km*24.6)+150)*1.1/10)*10;}
+
+async function runRoute(){
+  if(routeStops.length<2)return;
+  const mode=document.querySelector('input[name="rmode"]:checked').value;
+  const key=document.getElementById('orsKey').value.trim();
+  const coords=routeStops.map(id=>[SPOTS[id].lng,SPOTS[id].lat]);
+  const res=document.getElementById('routeResult');
+  res.innerHTML='<div class="rp-card"><span class="rp-spin"></span>ルートを計算中…</div>';
+  try{
+    let data,note='';
+    if(key){data=await routeORS(coords,mode==='free',key);}
+    else{if(mode==='free')note='<div class="rp-card">「一般道のみ」と料金概算には無料APIキーが必要です（下の設定）。今回は最速ルートで表示します。</div>';
+         data=await routeOSRM(coords);}
+    drawRoute(data,mode);showResult(data,mode,note);
+  }catch(e){res.innerHTML=`<div class="rp-card">ルートを取得できませんでした。<div class="rp-warn">${(e&&e.message)||e}<br>少し時間をおいて再試行、または経由地を減らしてみてください。</div></div>`;}
+}
+async function routeOSRM(coords){
+  const path=coords.map(c=>c[0]+','+c[1]).join(';');
+  const url=`https://router.project-osrm.org/route/v1/driving/${path}?overview=full&geometries=geojson`;
+  const r=await fetch(url);if(!r.ok)throw new Error('OSRM '+r.status);const j=await r.json();
+  if(!j.routes||!j.routes.length)throw new Error('ルートが見つかりません');
+  const rt=j.routes[0];return {coords:rt.geometry.coordinates,distance:rt.distance,duration:rt.duration,tollSegs:[],tollDist:0,engine:'osrm'};
+}
+async function routeORS(coords,avoidToll,key){
+  const body={coordinates:coords,extra_info:['tollways'],instructions:false};
+  if(avoidToll)body.options={avoid_features:['tollways']};
+  const r=await fetch('https://api.openrouteservice.org/v2/directions/driving-car/geojson',{method:'POST',headers:{'Authorization':key,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){let m='ORS '+r.status;try{const e=await r.json();if(e.error&&(e.error.message||typeof e.error==='string'))m=e.error.message||e.error;}catch(_){}throw new Error(m);}
+  const j=await r.json();const f=j.features&&j.features[0];if(!f)throw new Error('ルートが見つかりません');
+  const g=f.geometry.coordinates,sum=f.properties.summary;let tollDist=0;const tollSegs=[];
+  const ex=f.properties.extras&&f.properties.extras.tollways;
+  if(ex){(ex.values||[]).forEach(v=>{if(v[2]===1)tollSegs.push([v[0],v[1]]);});(ex.summary||[]).forEach(s=>{if(s.value===1)tollDist+=s.distance;});}
+  return {coords:g,distance:sum.distance,duration:sum.duration,tollSegs,tollDist,engine:'ors'};
+}
+function drawRoute(d,mode){
+  if(routeLayer)map.removeLayer(routeLayer);
+  const ll=d.coords.map(c=>[c[1],c[0]]);
+  const base=L.polyline(ll,{color:mode==='free'?'#1C7A4A':'#2E86C8',weight:6,opacity:.85});
+  routeLayer=L.layerGroup([base]).addTo(map);
+  d.tollSegs.forEach(seg=>{const part=ll.slice(seg[0],seg[1]+1);if(part.length>1)L.polyline(part,{color:'#E23B3B',weight:6,opacity:.95,dashArray:'1,9',lineCap:'round'}).addTo(routeLayer);});
+  drawStops();map.fitBounds(base.getBounds(),{padding:[40,40]});
+}
+function showResult(d,mode,note){
+  const km=d.distance/1000,tkm=d.tollDist/1000;
+  let html=(note||'')+`<div class="rp-card"><h4>${mode==='free'?'一般道メイン':'最速（有料道路あり）'}のルート</h4>
+    <div class="rp-row"><span>総距離</span><b>${km.toFixed(1)} km</b></div>
+    <div class="rp-row"><span>所要時間（目安）</span><b>${fmtTime(d.duration)}</b></div>`;
+  if(d.engine==='ors'){
+    if(mode==='free')html+=`<div class="rp-row"><span>通行料金</span><b class="rp-toll">なし（一般道）</b></div>`;
+    else if(tkm>0)html+=`<div class="rp-row"><span>うち有料道路</span><b>${tkm.toFixed(1)} km</b></div><div class="rp-row"><span>通行料金（概算）</span><b class="rp-toll">約 ${tollYen(tkm).toLocaleString()} 円</b></div>`;
+    else html+=`<div class="rp-row"><span>有料道路</span><b>利用なし</b></div>`;
+    html+=`<div class="rp-warn">※料金は普通車・現金の単純概算（有料区間 距離×24.6円＋150円、税込）。ETC割引・大都市近郊区間・路線別料金は未反映です。正確な額はNEXCO等の料金検索でご確認ください。</div>`;
+  }else{
+    html+=`<div class="rp-warn">※キー無しの簡易ルートのため、有料/一般道の区別と料金は非表示です。料金概算は下の無料APIキー設定で有効化できます。</div>`;
+  }
+  html+='</div>';document.getElementById('routeResult').innerHTML=html;
+}
+
+render();
+</script>
+</body>
+</html>
