@@ -117,6 +117,10 @@
     .brand h1{font-size:16px}.counts{order:3}
   }
 
+.mk-home{width:30px;height:30px;border-radius:50%;background:#3B2E1A;border:2.5px solid var(--gold);box-shadow:0 2px 7px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:16px}
+.pop.home .bar{background:var(--gold);color:#3a2d0d}
+.card.home .tag{background:var(--gold);color:#3a2d0d}
+.legend .hm{width:13px;height:13px;border-radius:50%;background:#3B2E1A;border:2px solid var(--gold)}
 /* ---- route planner ---- */
 #routePanel{width:340px;flex:0 0 340px;background:var(--cream);border-right:2px solid var(--line);overflow-y:auto;padding:12px;display:none}
 body.route #aside{display:none}
@@ -231,6 +235,7 @@ body.route .routebtn{background:#fff;color:var(--rose)}
 const R={south:"県南",sendai:"仙台都市圏",north:"県北",coast:"三陸沿岸"};
 // kind: poke|eki ; region: hama|naka|aizu
 const SPOTS=[
+{k:"home",n:"🏠 自宅（ワンパークレジデンシャルタワーズ）",mu:"仙台市太白区",rg:"sendai",lat:38.223298,lng:140.8874186,pl:"あすと長町",ad:"仙台市太白区あすと長町4-3-54",ft:"自宅。あすと長町の高層タワー。JR長町駅・あすと長町公園に近い。"},
 // ===== ポケふた（宮城・全35市町村）=====
 {k:"poke",n:"ポケふた 白石市",mu:"白石市",rg:"south",lat:38.003,lng:140.620,pl:"白石城周辺（要確認）",ad:"白石市",ft:"応援ポケモン「ラプラス」と白石城・白石温麺の城下町をイメージ。"},
 {k:"poke",n:"ポケふた 角田市",mu:"角田市",rg:"south",lat:37.978,lng:140.781,pl:"角田市内（要確認）",ad:"角田市",ft:"ラプラスと、宇宙開発（ロケット）のまち角田をイメージ。"},
@@ -294,14 +299,14 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r
   attribution:'&copy; OpenStreetMap, &copy; CARTO',maxZoom:19,subdomains:'abcd'}).addTo(map);
 map.fitBounds([[37.85,140.3],[38.98,141.66]],{padding:[20,20]});
 
-function icon(s){return L.divIcon({className:'',html:`<div class="mk mk-${s.k==='poke'?'poke':'eki'}" data-id="${s.id}"></div>`,
+function icon(s){if(s.k==='home'){return L.divIcon({className:'',html:'<div class="mk mk-home">🏠</div>',iconSize:[30,30],iconAnchor:[15,15]});}return L.divIcon({className:'',html:`<div class="mk mk-${s.k==='poke'?'poke':'eki'}" data-id="${s.id}"></div>`,
   iconSize:s.k==='poke'?[22,22]:[19,19],iconAnchor:s.k==='poke'?[11,11]:[9.5,9.5]});}
 
 function gmap(s){return `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`;}
 function popHtml(s){
   const off = s.k==='poke' ? `<a class="btn off" target="_blank" href="https://local.pokemon.jp/manhole/miyagi.html">公式</a>`:'';
   return `<div class="pop ${s.k}">
-    <div class="bar"><div class="kind">${s.k==='poke'?'POKÉ LID ・ ポケふた':'ROADSIDE ・ 道の駅'} ｜ ${R[s.rg]}</div><h3>${s.n}</h3></div>
+    <div class="bar"><div class="kind">${s.k==='home'?'HOME ・ 自宅':(s.k==='poke'?'POKÉ LID ・ ポケふた':'ROADSIDE ・ 道の駅')} ｜ ${R[s.rg]}</div><h3>${s.n}</h3></div>
     <div class="body">
       <div class="row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg><div><span class="ttl">設置・所在</span><br>${s.pl}<br><span style="color:var(--muted);font-size:11.5px">${s.ad}</span></div></div>
       <div class="row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><div><span class="ttl">特徴</span><br>${s.ft}</div></div>
@@ -323,6 +328,7 @@ lg.onAdd=function(){const d=L.DomUtil.create('div','legend');
   d.innerHTML=`<b>凡例</b>
     <div class="lg"><span class="sp"></span>ポケふた（全35市町村）</div>
     <div class="lg"><span class="sq"></span>道の駅（17駅）</div>
+    <div class="lg"><span class="hm"></span>自宅</div>
     <div class="note">※全37か所のうち市町村代表の35か所を掲載。住所・設置場所は参考情報、「要確認」は公式マップで確認を。</div>`;
   return d;};
 lg.addTo(map);
@@ -334,6 +340,7 @@ let selId=null;
 let routeMode=false,routeStops=[],routeLayer=null,stopLayer=null;
 
 function visible(s){
+  if(s.k==='home'){if(filter.q){const t=(s.n+s.mu+s.ft+s.pl+s.ad).toLowerCase();return t.includes(filter.q);}return true;}
   if(filter.type!=='all'&&s.k!==filter.type) return false;
   if(filter.region!=='all'&&s.rg!==filter.region) return false;
   if(filter.q){const t=(s.n+s.mu+s.ft+s.pl+s.ad).toLowerCase();if(!t.includes(filter.q))return false;}
@@ -352,7 +359,7 @@ function render(){
   list.forEach(s=>{
     const c=document.createElement('div');
     c.className=`card ${s.k}${s.id===selId?' sel':''}`;c.dataset.id=s.id;
-    c.innerHTML=`<span class="tag">${s.k==='poke'?'ポケふた':'道の駅'}</span>
+    c.innerHTML=`<span class="tag">${s.k==='home'?'自宅':(s.k==='poke'?'ポケふた':'道の駅')}</span>
       <h3>${s.n}</h3>
       <div class="meta">${s.mu} ・ ${R[s.rg]}</div>
       <div class="feat">${s.ft}</div>
@@ -385,7 +392,7 @@ document.getElementById('mtoggle').addEventListener('click',()=>aside.classList.
 
 // ===== Route planner =====
 const ADD=document.getElementById('addSelect');
-SPOTS.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=(s.k==='poke'?'◯ ':'■ ')+s.n;ADD.appendChild(o);});
+SPOTS.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=(s.k==='home'?'🏠 ':(s.k==='poke'?'◯ ':'■ '))+s.n;ADD.appendChild(o);});
 ADD.addEventListener('change',()=>{if(ADD.value!=='')addStop(+ADD.value);ADD.value='';});
 document.getElementById('routeBtn').addEventListener('click',toggleRoute);
 document.getElementById('routeClose').addEventListener('click',toggleRoute);
