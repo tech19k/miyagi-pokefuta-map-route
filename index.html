@@ -217,6 +217,19 @@ body.route .routebtn{background:#fff;color:var(--rose)}
   #routePanel.min::before{display:none}
 }
 
+
+/* ===== slim route bar (map-first) ===== */
+.rp-bar{display:flex;gap:8px;margin-bottom:10px}
+.rp-bar .rp-add{margin-bottom:0;flex:1;min-width:0}
+.rp-go2{flex:0 0 auto;border:none;background:var(--rose);color:#fff;font-weight:700;padding:0 18px;border-radius:10px;font-family:inherit;font-size:13px;cursor:pointer}
+.rp-go2:disabled{opacity:.45;cursor:default}
+@media(max-width:780px){
+  #routePanel{height:54vh}
+  #routePanel.min{height:auto;overflow:hidden}
+  #routePanel.min .rp-body{display:none}
+  #routePanel .rp-head{position:relative;top:auto}
+}
+
 </style>
 </head>
 <body>
@@ -259,28 +272,30 @@ body.route .routebtn{background:#fff;color:var(--rose)}
   <button id="listClose" aria-label="一覧を閉じる" style="position:fixed;z-index:1101;right:14px;bottom:calc(64vh - 22px);width:38px;height:38px;border-radius:50%;border:none;background:var(--ink);color:#fff;font-size:18px;line-height:1;box-shadow:0 3px 10px rgba(0,0,0,.3);cursor:pointer">✕</button>
 
 <div id="routePanel">
-  <div class="rp-head"><span>🧭 ルート計画</span><button id="rpToggle">▾ 地図を広く</button><button id="routeClose">地図に戻る</button></div>
-  <div class="rp-hint">出発地 → 経由地 → 到着地 の順に追加します。地図のマーカーをタップ、または下のメニューから選択。</div>
-  <select class="rp-add" id="addSelect"><option value="">＋ 地点を選んで追加…</option></select>
-  <div class="rp-stops" id="stopsList"></div>
-  <div class="rp-opt">
-    <div class="rp-label">道路の種類</div>
-    <label><input type="radio" name="rmode" value="fast" checked> 最速（有料道路あり）</label>
-    <label><input type="radio" name="rmode" value="free"> 一般道のみ（料金なし）</label>
+  <div class="rp-head"><button id="rpToggle" class="rp-toggle">▴</button><span class="rp-title">🧭 ルート</span><span id="rpMini" class="rp-mini"></span><button id="routeClose">地図に戻る</button></div>
+  <div class="rp-bar">
+    <select class="rp-add" id="addSelect"><option value="">＋ 地点を追加…</option></select>
+    <button id="routeGo" class="rp-go2" disabled>検索</button>
   </div>
-  <div class="rp-actions">
-    <button id="routeGo" class="rp-go" disabled>ルートを検索</button>
-    <button id="routeClear" class="rp-clear">クリア</button>
-  </div>
-  <div id="routeResult" class="rp-result"></div>
-  <details class="rp-key">
-    <summary>有料/一般道の出し分け・料金概算を有効にする（無料APIキー）</summary>
-    <div class="rp-keybody">
-      <p>OpenRouteService（無料）のAPIキーを貼り付けると、「一般道のみ」ルートと有料区間・通行料金の概算が使えます。キー無しでも距離・時間の簡易ルートは使えます。</p>
-      <input id="orsKey" placeholder="ORS APIキーを貼り付け（任意）">
-      <a href="https://openrouteservice.org/dev/#/signup" target="_blank">▶ 無料キーを取得する</a>
+  <div class="rp-body">
+    <div class="rp-hint">出発 → 経由 → 到着 の順に追加。地図のマーカーをタップ、または上のメニューから選択。並べ替え・削除もできます。</div>
+    <div class="rp-stops" id="stopsList"></div>
+    <div class="rp-opt">
+      <div class="rp-label">道路の種類</div>
+      <label><input type="radio" name="rmode" value="fast" checked> 最速（有料道路あり）</label>
+      <label><input type="radio" name="rmode" value="free"> 一般道のみ（料金なし）</label>
     </div>
-  </details>
+    <div class="rp-actions"><button id="routeClear" class="rp-clear">クリア</button></div>
+    <div id="routeResult" class="rp-result"></div>
+    <details class="rp-key">
+      <summary>有料/一般道の出し分け・料金概算（無料APIキー）</summary>
+      <div class="rp-keybody">
+        <p>OpenRouteService（無料）のAPIキーを貼ると、「一般道のみ」ルートと有料区間・通行料金の概算が使えます。キー無しでも距離・時間は使えます。</p>
+        <input id="orsKey" placeholder="ORS APIキーを貼り付け（任意）">
+        <a href="https://openrouteservice.org/dev/#/signup" target="_blank">▶ 無料キーを取得する</a>
+      </div>
+    </details>
+  </div>
 </div>
 
   <div id="map"></div>
@@ -456,7 +471,7 @@ document.getElementById('routeClear').addEventListener('click',clearRoute);
 document.getElementById('routeGo').addEventListener('click',runRoute);
 
 function toggleRoute(){routeMode=!routeMode;document.body.classList.toggle('route',routeMode);
-  if(routeMode){map.closePopup();aside.classList.remove('open');renderStops();var _rp=document.getElementById('routePanel');_rp.classList.remove('min');var _t=document.getElementById('rpToggle');if(_t)_t.textContent='▾';}}
+  if(routeMode){map.closePopup();aside.classList.remove('open');renderStops();var _rp=document.getElementById('routePanel'),_t=document.getElementById('rpToggle');if(window.innerWidth<=780){_rp.classList.add('min');if(_t)_t.textContent='▴';}else{_rp.classList.remove('min');if(_t)_t.textContent='▾';}}}
 function addStop(id){if(routeStops.length&&routeStops[routeStops.length-1]===id)return;
   routeStops.push(id);map.closePopup();setTimeout(()=>map.closePopup(),30);renderStops();drawStops();}
 function removeStop(i){routeStops.splice(i,1);renderStops();drawStops();}
